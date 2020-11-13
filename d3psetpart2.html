@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<title>Mapping with D3</title>
+	<script src="https://d3js.org/d3.v5.min.js" charset="utf-8"></script>
+	<script src="https://d3js.org/d3-scale-chromatic.v1.min.js"></script>
+    <script src="https://d3js.org/topojson.v2.min.js"></script>
+
+</head>
+<body>
+    <!-- Page elements and content go here. -->
+    <div id = "main">
+        ​
+     </div> 
+	<script type ="text/javascript">
+		// Our D3 code will go here.
+        var width = 1200
+        var height = 900;
+
+		var svg = d3.select("body")
+            .append("svg")
+			.attr("width", width)
+			.attr("height", height);
+		//Load data
+		var bostontopoURL= "https://gist.githubusercontent.com/cesandoval/09b2e39263c748fbcb84b927cecc7c46/raw/ab71d3638efd2545ec99c2651c6f2ddcea9d2a07/boston.json"
+
+		var boston_311URL = "https://raw.githubusercontent.com/brookefzy/BigData2020/master/pset6/boston_311.csv";
+       
+                                
+		var g = svg.append("g")
+					.attr("class", "key")
+					.attr("transform", "translate(0,40)");        
+        
+        var albersProjection= d3.geoAlbers()
+            .scale(190000)
+            .rotate([71.057,0])
+            .center([0,42.313])
+            .translate([width/2,height/2]);
+
+        var geoPath=d3.geoPath()
+            .projection(albersProjection);
+
+        var bos_map= d3.map();
+		var promises = [
+										d3.json(bostontopoURL),
+										d3.csv(boston_311URL, function(d){
+                                            bos_map.set(d.Name, [+d.twitter,+d.twitter/+d.tot_count]);})
+									 ]
+        
+        //d3.json(bostontopoURL).then(ready)
+        
+        Promise.all(promises).then(ready);
+
+        function ready([boston]){
+            svg.append("g")
+            .selectAll("path")
+            .data(topojson.feature(boston, boston.objects.boston_neigh).features)
+            .enter()
+            .append("path")
+            .style("fill", function(d){return color(d.twitter = Math.log(bos_map.get(d.properties.Name)[0]));})
+            //.style("fill", "white") //REMOVE THIS LINE
+            //.style("stroke", "black") //REMOVE THIS LINE
+            .attr("d", geoPath)
+            //Mousover interaction labels
+            .on("mousemove", function(d){
+                tooltip.style("left", d3.event.pageX + "px")
+                        .style("top", d3.event.pageY + "px");
+
+            }).on("mouseover", function(d){
+                tooltip.html(d.properties.Name + "<br>" + (bos_map.get(d.properties.Name)[1] * 100).toFixed(3) + "% Twitter requests")
+                        .style("visibility", "visible")
+                        .style("line-height", "1.5")
+            }).on("mouseout", function(d){
+                tooltip.style("visibility", "hidden");
+
+            })
+
+        }       
+
+
+            var color = d3.scaleQuantize()
+                    .domain([0, 5.5])
+                    .range(d3.schemePurples[9]);
+
+            var x = d3.scaleLinear()
+                        .domain([1,10])
+                        .rangeRound([600, 860]);
+
+
+            g.selectAll("rect")
+                        .data(color.range().map(function(d) {
+                            d = color.invertExtent(d);
+                            if (d[0] == null) d[0] = x.domain()[0];
+                            if (d[1] == null) d[1] = x.domain()[1];
+                            return d;
+                        }))
+                        .enter().append("rect")
+                        .attr("height", 10)
+                        .attr("x", function(d) { return x(d[0]); })
+                        .attr("width", function(d) { return x(d[1]) - x(d[0]); })
+                        .attr("fill", function(d) { return color(d[0]); });
+
+            var tooltip = d3.select("body")
+                            .append("tspan")
+                            .style("visibility", "hidden")
+                            .style("opacity", ".6")
+                            .style("background", "white")
+                            .style("z-index", "1")
+                            .style("font", "arial 14px") 
+                            .style("padding", "5px")
+                            .style("position", "absolute") 
+
+            g.append("text")
+                        .attr("class", "caption")
+                        .attr("x", x.range()[0])
+                        .attr("y", -6)
+                        .attr("fill", "#000")
+                        .attr("text-anchor", "start")
+                        .attr("font-weight", "bold")
+                        .text("Tweets (log scale)");
+
+            g.call(d3.axisBottom(x)
+                .tickSize(15)
+                .tickFormat(function(x, i) { return x; })
+                .tickValues(color.domain()))
+                .select(".domain")
+                .remove();
+ 
+	</script>
+</body>
+</html>
